@@ -699,7 +699,7 @@ gen_uart_mos_6551 mos_6551 (
 	.din(cpu_dout),
 	.dout(acia_dout),
 	.rnw(cpu_rw),
-	.cs(acia_cs),
+	.cs(acia_cs & clk_E),
 	.rs(cpu_addr[1:0]),
 	.irq_n(acia_irq_n),
 	.cts_n(1'b0),
@@ -727,7 +727,7 @@ reg        fdc_nmi_en;
 reg        fdc_halt_en;
 
 wire       fdc_ctrl_write = disk_cart_enabled & clk_E & io_cs & !cpu_rw & (~cpu_addr[3] ^ dragon);
-wire       fdc_sel = disk_cart_enabled & io_cs & (cpu_addr[3] ^ dragon) & (!dragon | ~cpu_addr[2]);
+wire       fdc_sel = disk_cart_enabled & clk_E & io_cs & (cpu_addr[3] ^ dragon) & (!dragon | ~cpu_addr[2]);
 wire       fdc_irq, fdc_drq;
 
 assign io_out = fdc_dout;
