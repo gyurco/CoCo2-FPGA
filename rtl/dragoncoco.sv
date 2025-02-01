@@ -65,6 +65,7 @@ module dragoncoco(
 	output [11:0] sound,
 	output sndout,
 
+	output ledb,
 	// DISK
 	//
 	input disk_cart_enabled,
@@ -798,5 +799,7 @@ fdc1772 #(.FD_NUM(4), .MODEL(3), .EXT_MOTOR(1'b1)) wd1793 (
 //	.floppy_density ( floppy_density   ),
 	.floppy_reset	( reset_n          )
 );
+
+assign ledb = ~(ioctl_download | fdc_motor);
 
 endmodule

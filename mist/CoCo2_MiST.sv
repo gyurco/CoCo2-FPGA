@@ -212,7 +212,7 @@ wire        disk_ena = status[14];
 wire        kblayout = ~status[15];
 
 wire        ledb;
-assign      LED = ~ledb;
+assign      LED = ledb;
 
 wire clk57, pll_locked;
 pll pll(
@@ -450,6 +450,7 @@ dragoncoco dragoncoco(
   .cass_snd(adc_value),
   .sound(sound),
   .sndout(sndout),
+  .ledb(ledb),
 
   // we load the disk ROM instead of cart ram
   .disk_cart_enabled(disk_ena),
