@@ -8,6 +8,7 @@ set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ./fdc17
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ./fdc1772/fdc1772.v      ]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ./mc6809is.v      ]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ./pia6520.v      ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ./sdram.v      ]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ./keyboard.sv      ]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ./dragoncoco.sv      ]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ./trs80_dac.sv      ]

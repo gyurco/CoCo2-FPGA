@@ -1,4 +1,3 @@
-
 // todo: find a better name
 module dragoncoco(
 	input clk, // 57.272 mhz
@@ -66,6 +65,17 @@ module dragoncoco(
 	output sndout,
 
 	output ledb,
+
+	output   [19:0] ext_ram_addr,
+	input     [7:0] ext_ram_din,
+	output    [7:0] ext_ram_dout,
+	output          ext_ram_rd,
+	output          ext_ram_wr,
+
+	output   [19:0] ext_rom_addr,
+	output          ext_rom_rd,
+	input     [7:0] ext_rom_din,
+
 	// DISK
 	//
 	input disk_cart_enabled,
@@ -116,7 +126,6 @@ wire ram_cs,rom8_cs,romA_cs,romC_cs,io_cs,pia1_cs,pia_cs,pia_orig_cs;
 
 reg [7:0]vdg_data;
 reg [7:0] ram_dout;
-reg [7:0] ram_dout_b;
 wire [7:0] rom8_dout;
 wire [7:0] romA_dout;
 wire [7:0] romC_dout;
@@ -210,6 +219,7 @@ mc6809is cpu(
 	.nDMABREQ(1)
 );
 
+`ifdef INTERNAL_RAM
 dpram #(.addr_width_g(16), .data_width_g(8)) ram1(
 	.clock_a(clk),
 	.address_a(sam_a),
@@ -225,6 +235,64 @@ dpram #(.addr_width_g(16), .data_width_g(8)) ram1(
 	.wren_b(hard_reset),
 	.q_b()
 );
+`else
+assign ram_dout = ext_ram_din;
+`endif
+
+// external RAM multiplexer
+wire rom_cs = rom8_cs | romA_cs | romC_cs;
+
+reg  [16:0] rom_a;
+always @(*) begin
+	rom_a[12:0] = cpu_addr[12:0];
+	rom_a[16:13] = 4'h0;
+	if (dragon64) begin
+		case (1'b1)
+			rom8_1_cs : rom_a[16:13] = 4'h5;
+			romA_1_cs : rom_a[16:13] = 4'h6;
+			rom8_2_cs : rom_a[16:13] = 4'h7;
+			romA_2_cs : rom_a[16:13] = 4'h8;
+			romC_cs : rom_a[16:13] = cart_loaded ? {3'b111, cpu_addr[13]} : 4'h9;
+			default : ;
+		endcase
+	end else if (dragon) begin
+		case (1'b1)
+			rom8_cs : rom_a[16:13] = 4'h3;
+			romA_cs : rom_a[16:13] = 4'h4;
+			romC_cs : rom_a[16:13] = cart_loaded ? {3'b111, cpu_addr[13]} : 4'h9;
+			default : ;
+		endcase
+	end else begin
+		case (1'b1)
+			rom8_cs : rom_a[16:13] = 4'h1;
+			romA_cs : rom_a[16:13] = 4'h0;
+			romC_cs : rom_a[16:13] = cart_loaded ? {3'b111, cpu_addr[13]} : 4'h2;
+			default : ;
+		endcase
+	end
+end
+
+assign ext_rom_addr = {3'd0, rom_a};
+assign ext_rom_rd = clk_E & rom_cs;
+
+wire [16:0] dl_a = ioctl_rom ? ioctl_addr[16:0] : {3'b111, ioctl_addr[13:0]};
+
+assign ext_ram_addr = ioctl_download ? {3'd0, dl_a} : 
+                      {4'b1000, hard_reset ? 16'h71 : sam_a};
+
+reg   [7:0] dl_wr;
+always @(posedge clk) begin
+	if (ioctl_wr) dl_wr <= 8'hFF;
+	else dl_wr <= {1'b0, dl_wr[7:1]};
+end
+
+assign ext_ram_wr = ioctl_download ? |dl_wr : hard_reset ? clk_E : ~sam_we_n;
+
+reg         ram_rd_cycle;
+always @(posedge clk) ram_rd_cycle <= ~cas_n;
+assign ext_ram_rd = ram_rd_cycle & ~ioctl_download;
+
+assign ext_ram_dout = ioctl_download ? ioctl_data : hard_reset ? 8'h00 : cpu_dout;
 
 // 8k extended basic rom
 // Do we need an option to enable/disable extended basic rom?
@@ -232,6 +300,7 @@ assign rom8_dout = dragon ? rom8_dout_dragon : rom8_dout_tandy;
 wire [7:0] rom8_dout_dragon;
 wire [7:0] rom8_dout_tandy;
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) rom8_tandy(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -247,7 +316,11 @@ dpram #(.addr_width_g(13), .data_width_g(8)) rom8_tandy(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 1),
 	.q_b()
 );
+`else
+assign rom8_dout_tandy = ext_rom_din;
+`endif
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) rom8_dragon(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -263,12 +336,16 @@ dpram #(.addr_width_g(13), .data_width_g(8)) rom8_dragon(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 3),
 	.q_b()
 );
+`else
+assign rom8_dout_dragon = ext_rom_din;
+`endif
 
 assign romA_dout = dragon ? romA_dout_dragon : romA_dout_tandy;
 wire [7:0] romA_dout_dragon;
 wire [7:0] romA_dout_tandy;
 
 // 8k color basic rom
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) romA_tandy(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -284,7 +361,11 @@ dpram #(.addr_width_g(13), .data_width_g(8)) romA_tandy(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 0),
 	.q_b()
 );
+`else
+assign romA_dout_tandy = ext_rom_din;
+`endif
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) romA_dragon(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -300,6 +381,9 @@ dpram #(.addr_width_g(13), .data_width_g(8)) romA_dragon(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 4),
 	.q_b()
 );
+`else
+assign romA_dout_dragon = ext_rom_din;
+`endif
 
 //
 // Dragon 64 has two banks of 16k roms. We split them into 
@@ -310,6 +394,7 @@ wire [7:0] rom8_64_2;
 wire [7:0] romA_64_1;
 wire [7:0] romA_64_2;
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) romA_d64_1(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -325,7 +410,11 @@ dpram #(.addr_width_g(13), .data_width_g(8)) romA_d64_1(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 6),
 	.q_b()
 );
+`else
+assign romA_64_1 = ext_rom_din;
+`endif
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) rom8_d64_1(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -341,7 +430,11 @@ dpram #(.addr_width_g(13), .data_width_g(8)) rom8_d64_1(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 5),
 	.q_b()
 );
+`else
+assign rom8_64_1 = ext_rom_din;
+`endif
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) romA_d64_2(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -357,7 +450,11 @@ dpram #(.addr_width_g(13), .data_width_g(8)) romA_d64_2(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 8),
 	.q_b()
 );
+`else
+assign romA_64_2 = ext_rom_din;
+`endif
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) rom8_d64_2(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -373,6 +470,9 @@ dpram #(.addr_width_g(13), .data_width_g(8)) rom8_d64_2(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 7),
 	.q_b()
 );
+`else
+assign rom8_64_2 = ext_rom_din;
+`endif
 
 reg cart_loaded = 0;
 always @(posedge clk)
@@ -381,6 +481,7 @@ always @(posedge clk)
 	else if (cart_remove)
 		cart_loaded <= 0;
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(14), .data_width_g(8)) romC(
 	.clock_a(clk),
 	.address_a(cpu_addr[13:0]),
@@ -392,8 +493,12 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
 	.data_b(ioctl_data),
 	.wren_b(ioctl_wr & ioctl_cart)
 );
+`else
+assign romC_cart_dout = ext_rom_din;
+`endif
 
 /*dragon_dsk*/
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) rom_disk_dragon(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -409,7 +514,11 @@ dpram #(.addr_width_g(13), .data_width_g(8)) rom_disk_dragon(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 9),
 	.q_b()
 );
+`else
+assign romC_dragondisk_dout = ext_rom_din;
+`endif
 
+`ifdef INTERNAL_ROM
 dpram #(.addr_width_g(13), .data_width_g(8)) rom_disk_tandy(
 	.clock_a(clk),
 	.address_a(cpu_addr[12:0]),
@@ -425,6 +534,9 @@ dpram #(.addr_width_g(13), .data_width_g(8)) rom_disk_tandy(
 	.wren_b(ioctl_wr & ioctl_rom & ioctl_addr[16:13] == 2),
 	.q_b()
 );
+`else
+assign romC_disk_dout = ext_rom_din;
+`endif
 
 assign romC_dout = cart_loaded ? romC_cart_dout : disk_cart_enabled ? (dragon ? romC_dragondisk_dout : romC_disk_dout) : 8'hFF;
 
@@ -439,18 +551,15 @@ reg cas_n_r;
 
 always @(posedge clk)
 begin
-	if (clk_enable)
-	begin
-		if (ras_n & ~ras_n_r) vdg_data <= ram_dout;
+	if (ras_n & ~ras_n_r) vdg_data <= ram_dout;
 
-		if (~ras_n & ras_n_r)
-			sam_a[7:0]<= ma_ram_addr;
-		if (~cas_n & cas_n_r)
-			sam_a[15:8] <= ma_ram_addr;
+	if (~ras_n & ras_n_r)
+		sam_a[7:0]<= ma_ram_addr;
+	if (~cas_n & cas_n_r)
+		sam_a[15:8] <= ma_ram_addr;
 
-		ras_n_r <= ras_n;
-		cas_n_r <= cas_n;
-	end
+	ras_n_r <= ras_n;
+	cas_n_r <= cas_n;
 end
 
 mc6883 sam(

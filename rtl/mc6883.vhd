@@ -160,16 +160,16 @@ begin
 	turbo <= '1' when r_mpu_rate(1) = '1' or (r_mpu_rate(0) = '1' and sel_ram = '0') else '0';
 
 	process(r_mpu_rate, count, sel_ram, z_ram_addr_s, we_n_s, ras0_n_s, cas_n_s, rw_n,
-	        video_ras_addr, video_cas_addr, mpu_ras_addr, mpu_cas_addr)
+	        video_ras_addr, video_cas_addr, mpu_ras_addr, mpu_cas_addr, turbo)
 	begin
 		clk_e_en_p <= '0';
 		clk_q_en_p <= '0';
 		clk_e_en_n <= '0';
 		clk_q_en_n <= '0';
 		z_ram_addr_next <= z_ram_addr_s;
-		we_n_next <= '1';
 		ras0_n_next <= ras0_n_s;
 		cas_n_next <= cas_n_s;
+		we_n_next <= we_n_s;
 
 		case count is
 			when "0000" =>
@@ -192,11 +192,12 @@ begin
 			when "0011" =>
 				if turbo = '0' then clk_q_en_p <= '1'; end if;
 				if turbo = '1' then clk_e_en_p <= '1'; end if;
+				we_n_next <= rw_n or not sel_ram or not turbo;
 			when "0100" =>
 			when "0101" =>
+				we_n_next <= '1';
 				ras0_n_next <= '1';
 				if turbo = '1' then clk_q_en_n <= '1'; end if;
-				we_n_next <= rw_n or not sel_ram or not turbo;
 			when "0110" =>
 			when "0111" =>
 				cas_n_next <= '1';
@@ -215,14 +216,12 @@ begin
 			when "1011" =>
 				if turbo = '0' then clk_q_en_n <= '1'; end if;
 				if turbo = '1' then clk_e_en_p <= '1'; end if;
+				we_n_next <= rw_n or not sel_ram;
 			when "1100" =>
 			when "1101" =>
 				ras0_n_next <= '1';
+				we_n_next <= '1';
 				if turbo = '1' then clk_q_en_n <= '1'; end if;
-				-- drive WEn some time after mpu address is latched
-				-- on the falling edge of cas_n above
-				-- but in plenty of time before falling edge of E
-				we_n_next <= rw_n or not sel_ram;
 			when "1110" =>
 			when "1111" =>
 				cas_n_next <= '1';
