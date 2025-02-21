@@ -30,6 +30,8 @@ module dragoncoco(
 
 	input uart_rx,
 	output uart_tx,
+	input uart_cts,
+	output uart_rts,
 
 	// keyboard
 	input        key_strobe,
@@ -647,15 +649,15 @@ pia6520 pia(
 
 assign irq = pia_irq | (dragon64 & ~acia_irq_n);
 
-wire casdin0;
-wire rsout1;
-wire [5:0] dac_data;
-wire sela,selb;
-wire snden;
+wire       sela,selb;
+wire       snden;
 // 1 bit sound
-assign sndout = pia1_portb_out[1];
+assign     sndout = pia1_portb_out[1];
 wire [7:0] DDRB;
-wire cart_n = (disk_cart_enabled & dragon) ? fdc_drq : (clk_Q | ~cart_loaded);
+wire       cart_n = (disk_cart_enabled & dragon) ? fdc_drq : (clk_Q | ~cart_loaded);
+wire [7:0] pia1_porta_out;
+wire [5:0] dac_data = pia1_porta_out[7:2];
+wire       rsout1 = pia1_porta_out[1];
 
 pia6520 pia1(
 	.data_out(pia1_dout),
@@ -665,7 +667,7 @@ pia6520 pia1(
 	.we(we),
 	.irq(firq),
 	.porta_in({7'd0,casdout}),
-	.porta_out({dac_data,casdin0,rsout1}),
+	.porta_out(pia1_porta_out),
 	.portb_in(dragon?8'b00000001:{5'd0, mem64kb ? kb_cols[5] : 1'b1, 1'b0, uart_rx}),
 	.portb_out(pia1_portb_out),
 	.DDRB(DDRB),
@@ -796,7 +798,7 @@ trs80_dac dac(
 
 //dragon 64 has a serial module wired in based on addr[2]
 wire [7:0] acia_dout;
-wire       acia_tx;
+wire       acia_tx, acia_rts;
 wire       acia_irq_n;
 wire       clk_en_18432;
 
@@ -812,16 +814,17 @@ gen_uart_mos_6551 mos_6551 (
 	.cs(acia_cs & clk_E),
 	.rs(cpu_addr[1:0]),
 	.irq_n(acia_irq_n),
-	.cts_n(1'b0),
+	.cts_n(uart_cts),
 	.dcd_n(1'b0),
 	.dsr_n(1'b0),
 	.dtr_n(),
-	.rts_n(),
+	.rts_n(acia_rts),
 	.rx(uart_rx),
 	.tx(acia_tx)
 );
 
 assign uart_tx = dragon64 ? acia_tx : !dragon ? rsout1 : 1'b1;
+assign uart_rts = dragon64 ? acia_rts : 1'b0;
 //
 //  Floppy Controller Support
 //

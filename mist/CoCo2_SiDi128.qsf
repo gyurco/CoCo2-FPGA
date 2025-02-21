@@ -336,6 +336,9 @@ set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to HDMI_LRCK
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to HDMI_SDATA
 set_instance_assignment -name CURRENT_STRENGTH_NEW 4MA -to HDMI_MCLK
 
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to EXP7
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to MOTOR_CTRL
+
 # Classic Timing Assignments
 # ==========================
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0

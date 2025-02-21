@@ -110,8 +110,8 @@ module CoCo2_MiST (
 `ifdef USE_EXPANSION
 	input         UART_CTS,
 	output        UART_RTS,
-	output        EXP7,
-	output        MOTOR_CTRL,
+	inout         EXP7,
+	inout         MOTOR_CTRL,
 `endif
 	input         UART_RX,
 	output        UART_TX
@@ -374,7 +374,7 @@ wire [11:0] sound;
 reg   [1:0] cass_in;
 wire        cass_out;
 wire        cass_relay;
-wire        uart_tx;
+wire        uart_tx, uart_rts, uart_cts;
 wire        upcase;
 
 always @(posedge clk57) begin
@@ -387,10 +387,14 @@ always @(posedge clk57) begin
 end
 
 `ifdef USE_EXPANSION
-assign MOTOR_CTRL = cass_relay;
+assign MOTOR_CTRL = cass_relay ? 1'b0 : 1'bZ;
 assign UART_TX = uart_tx;
+assign UART_RTS = uart_rts;
+assign uart_cts = UART_CTS;
+assign EXP7 = 1'bZ;
 `else
 assign UART_TX = uart_en ? uart_tx : ~cass_relay;
+assign uart_cts = 0;
 `endif
 
 wire [19:0] ram_addr;
@@ -429,6 +433,8 @@ dragoncoco dragoncoco(
   .vclk(),
   .uart_rx(UART_RX),
   .uart_tx(uart_tx),
+  .uart_cts(uart_cts),
+  .uart_rts(uart_rts),
 
   .key_strobe(key_strobe),
   .key_pressed(key_pressed),
