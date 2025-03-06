@@ -107,7 +107,7 @@ module CoCo2_MiST (
 `ifdef USE_AUDIO_IN
 	input         AUDIO_IN,
 `endif
-`ifdef USE_EXPANSION
+`ifdef SIDI128_EXPANSION
 	input         UART_CTS,
 	output        UART_RTS,
 	inout         EXP7,
@@ -188,7 +188,7 @@ localparam CONF_STR = {
 	"OA,Memory,16K,64K;",
 	"OB,Joystick Swap,Off,On;",
 	"OC,Tape Sounds,Off,On;",
-`ifndef USE_EXPANSION
+`ifndef SIDI128_EXPANSION
 	"OD,Userport,Tape,UART;",
 `endif
 	"OE,Disk Cartridge,Disable,Enable;",
@@ -386,7 +386,7 @@ always @(posedge clk57) begin
 	cass_in[1] <= cass_in[0];
 end
 
-`ifdef USE_EXPANSION
+`ifdef SIDI128_EXPANSION
 assign MOTOR_CTRL = cass_relay ? 1'b0 : 1'bZ;
 assign UART_TX = uart_tx;
 assign UART_RTS = uart_rts;
